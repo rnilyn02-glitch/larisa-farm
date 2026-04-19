@@ -12,7 +12,8 @@ export function Toast({ message, type = 'error', onClose }: ToastProps) {
   useEffect(() => {
     const t = setTimeout(onClose, 4000)
     return () => clearTimeout(t)
-  }, [onClose])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return (
     <div
