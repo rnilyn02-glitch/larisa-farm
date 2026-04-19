@@ -1,40 +1,68 @@
-export default function Home() {
+import Link from 'next/link'
+
+const CATEGORIES = [
+  { slug: 'eggs',    label: 'Яйца',   emoji: '🥚' },
+  { slug: 'meat',    label: 'Мясо',   emoji: '🍗' },
+  { slug: 'veggies', label: 'Овощи',  emoji: '🥕' },
+  { slug: 'sets',    label: 'Наборы', emoji: '🎁' },
+]
+
+export default function HomePage() {
   return (
-    <main className="min-h-screen p-8">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-4xl font-bold text-center mb-8">
-          Добро пожаловать в Larisa Farm
+    <div>
+      {/* Hero */}
+      <section className="bg-gradient-to-b from-farm-green to-farm-green-light text-white px-4 py-16 text-center">
+        <h1 className="text-3xl sm:text-4xl font-bold mb-3">
+          Свежие продукты с фермы
         </h1>
-        <p className="text-xl text-center text-gray-600 mb-12">
-          Свежие фермерские продукты с доставкой на дом
+        <p className="text-white/80 mb-8 text-lg">
+          Доставка по Стрежевому каждое воскресенье
         </p>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-2xl font-semibold mb-4">Свежие яйца</h2>
-            <p className="text-gray-600">Домашние куриные яйца</p>
-            <p className="text-lg font-bold mt-2">120 ₽ / 10 шт</p>
+        <Link
+          href="/catalog"
+          className="inline-block bg-white text-farm-green font-semibold px-8 py-3 rounded-full hover:bg-farm-cream transition-colors"
+        >
+          Смотреть каталог →
+        </Link>
+      </section>
+
+      {/* Categories */}
+      <section className="max-w-5xl mx-auto px-4 py-10">
+        <h2 className="text-xl font-semibold text-farm-green mb-6 text-center">Категории</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          {CATEGORIES.map((cat) => (
+            <Link
+              key={cat.slug}
+              href={`/catalog?category=${cat.slug}`}
+              className="bg-white rounded-2xl p-6 flex flex-col items-center gap-2 shadow-sm hover:shadow-md transition-shadow"
+            >
+              <span className="text-4xl">{cat.emoji}</span>
+              <span className="text-farm-green font-medium">{cat.label}</span>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      {/* Why us */}
+      <section className="bg-white py-10 px-4">
+        <div className="max-w-5xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-6 text-center">
+          <div>
+            <div className="text-3xl mb-2">🌱</div>
+            <h3 className="font-semibold text-farm-green mb-1">Натуральные продукты</h3>
+            <p className="text-gray-500 text-sm">Без антибиотиков и ГМО. Всё с нашей фермы.</p>
           </div>
-          
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-2xl font-semibold mb-4">Домашняя курица</h2>
-            <p className="text-gray-600">Свежее мясо</p>
-            <p className="text-lg font-bold mt-2">450 ₽ / кг</p>
+          <div>
+            <div className="text-3xl mb-2">🚚</div>
+            <h3 className="font-semibold text-farm-green mb-1">Доставка на дом</h3>
+            <p className="text-gray-500 text-sm">Каждое воскресенье по всему Стрежевому.</p>
           </div>
-          
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-2xl font-semibold mb-4">Фермерский набор</h2>
-            <p className="text-gray-600">Ассорти продуктов</p>
-            <p className="text-lg font-bold mt-2">1500 ₽ / набор</p>
+          <div>
+            <div className="text-3xl mb-2">💳</div>
+            <h3 className="font-semibold text-farm-green mb-1">Удобная оплата</h3>
+            <p className="text-gray-500 text-sm">Онлайн через YooKassa или наличными.</p>
           </div>
         </div>
-        
-        <div className="text-center mt-12">
-          <p className="text-gray-500">
-            API доступен по адресу: {process.env.NEXT_PUBLIC_API_URL || 'https://api.ramirezi1.online'}
-          </p>
-        </div>
-      </div>
-    </main>
+      </section>
+    </div>
   )
 }
