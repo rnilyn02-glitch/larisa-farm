@@ -2,6 +2,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { api } from '@/lib/api'
+import type { Order } from '@/lib/types'
 
 const STATUS_LABELS: Record<string, { label: string; color: string; emoji: string }> = {
   new:        { label: 'Принят',           color: 'bg-blue-100 text-blue-700',   emoji: '📬' },
@@ -16,7 +17,7 @@ interface OrderPageProps {
 }
 
 export default async function OrderPage({ params }: OrderPageProps) {
-  let order
+  let order: Order
 
   try {
     order = await api.orders.get(params.id)
@@ -53,6 +54,8 @@ export default async function OrderPage({ params }: OrderPageProps) {
             <p className="text-sm text-gray-700 mb-2">Заказ подтверждён. Оплатите для оформления доставки:</p>
             <a
               href={order.payment_url}
+              target="_blank"
+              rel="noopener noreferrer"
               className="block w-full bg-farm-amber text-white text-center py-2.5 rounded-lg font-semibold hover:opacity-90 transition-opacity"
             >
               Оплатить {order.total_amount?.toLocaleString('ru-RU')} ₽
