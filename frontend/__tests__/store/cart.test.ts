@@ -13,7 +13,10 @@ const mockProduct: Product = {
 }
 
 describe('cart store', () => {
-  beforeEach(() => useCartStore.setState({ items: [], drawerOpen: false }))
+  beforeEach(() => {
+    localStorage.clear()
+    useCartStore.setState({ items: [], drawerOpen: false })
+  })
 
   it('adds item to empty cart', () => {
     useCartStore.getState().add(mockProduct)
