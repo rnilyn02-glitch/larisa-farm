@@ -1,0 +1,112 @@
+services:
+  # PostgreSQL Database for n8n and Farm App
+  db:
+    image: postgres:16-alpine
+    container_name: farm_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${N8N_DB_USER}
+      POSTGRES_PASSWORD: ${N8N_DB_PASSWORD}
+      POSTGRES_DB: ${N8N_DB_NAME}
+    volumes:
+      - ./postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${N8N_DB_USER} -d ${N8N_DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  # n8n Workflow Automation
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n
+    restart: unless-stopped
+    environment:
+      N8N_HOST: ${N8N_DOMAIN}
+      N8N_PORT: 5678
+      N8N_PROTOCOL: https
+      WEBHOOK_URL: https://${N8N_DOMAIN}/
+      N8N_EDITOR_BASE_URL: https://${N8N_DOMAIN}/
+      N8N_BASIC_AUTH_ACTIVE: "true"
+      N8N_BASIC_AUTH_USER: ${N8N_BASIC_AUTH_USER}
+      N8N_BASIC_AUTH_PASSWORD: ${N8N_BASIC_AUTH_PASSWORD}
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: db
+      DB_POSTGRESDB_PORT: 5432
+      DB_POSTGRESDB_USER: ${N8N_DB_USER}
+      DB_POSTGRESDB_PASSWORD: ${N8N_DB_PASSWORD}
+      DB_POSTGRESDB_DATABASE: ${N8N_DB_NAME}
+      EXECUTIONS_DATA_PRUNE: true
+      EXECUTIONS_DATA_MAX_AGE: 168
+      GENERIC_TIMEZONE: Asia/Tomsk
+      TZ: Asia/Tomsk
+    volumes:
+      - ./n8n_data:/home/node/.n8n
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - app-network
+
+  # pgAdmin for Database Management
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_MASTER_PASSWORD: ${PGADMIN_MASTER_PASSWORD}
+    volumes:
+      - ./pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - db
+    networks:
+      - app-network
+
+  # Next.js Frontend
+  nextjs:
+    build: ./frontend
+    container_name: nextjs_frontend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: https://${N8N_DOMAIN}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.nextjs.rule=Host(`${FRONTEND_DOMAIN}`) || Host(`www.${FRONTEND_DOMAIN}`)"
+      - "traefik.http.routers.nextjs.entrypoints=websecure"
+      - "traefik.http.routers.nextjs.tls.certresolver=letsencrypt"
+      - "traefik.http.services.nextjs.loadbalancer.server.port=3000"
+    networks:
+      - app-network
+    depends_on:
+      - db
+
+  # Traefik Reverse Proxy with static config
+  traefik:
+    image: traefik:v2.10
+    container_name: traefik
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./traefik_data/acme.json:/acme.json
+      - ./traefik_static.yml:/traefik.yml:ro
+      - ./traefik_dynamic.yml:/traefik_dynamic.yml:ro
+    command:
+      - "--configFile=/traefik.yml"
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge

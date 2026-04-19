@@ -1,0 +1,41 @@
+http:
+  routers:
+    n8n:
+      rule: "Host(`api.ramirezi1.online`)"
+      entryPoints:
+        - websecure
+      service: n8n
+      tls:
+        certResolver: letsencrypt
+    
+    pgadmin:
+      rule: "Host(`admin.ramirezi1.online`)"
+      entryPoints:
+        - websecure
+      service: pgadmin
+      tls:
+        certResolver: letsencrypt
+    
+    nextjs:
+      rule: "Host(`ramirezi1.online`) || Host(`www.ramirezi1.online`)"
+      entryPoints:
+        - websecure
+      service: nextjs
+      tls:
+        certResolver: letsencrypt
+
+  services:
+    n8n:
+      loadBalancer:
+        servers:
+          - url: "http://n8n:5678"
+    
+    pgadmin:
+      loadBalancer:
+        servers:
+          - url: "http://pgadmin:80"
+    
+    nextjs:
+      loadBalancer:
+        servers:
+          - url: "http://nextjs:3000"

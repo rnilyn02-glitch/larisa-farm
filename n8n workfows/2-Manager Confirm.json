@@ -1,0 +1,211 @@
+{
+  "name": "2-Manager Confirm",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "confirm-order",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "718efb81-d1f4-487b-ae4e-68daa76e1a56",
+      "name": "In_Webhook_Manager_Confirm",
+      "webhookId": "df5cd541-da75-4084-b297-6fe1ea3ed8d1"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE orders\nSET status = 'confirmed',\n    total_amount = {{ $json.body.final_amount }},\n    updated_at = NOW()\nWHERE id = '{{ $json.body.order_id }}' AND status = 'new';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        208,
+        0
+      ],
+      "id": "5fd02a02-a454-4929-94ef-a575a6a5d09e",
+      "name": "Core_Update_Order",
+      "credentials": {
+        "postgres": {
+          "id": "nfkRfyn28AyMTSG3",
+          "name": "farm_db"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.yookassa.ru/v3/payments",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Idempotence-Key",
+              "value": "={{ $('In_Webhook_Manager_Confirm').item.json.body.order_id }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"amount\": {\n    \"value\": \"{{ $('In_Webhook_Manager_Confirm').item.json.body.final_amount }}\",\n    \"currency\": \"RUB\"\n  },\n  \"confirmation\": {\n    \"type\": \"redirect\",\n    \"return_url\": \"https://api.ramirezi1.online/order-success\"\n  },\n  \"capture\": true,\n  \"description\": \"Оплата заказа {{ $('In_Webhook_Manager_Confirm').item.json.body.order_id }}\",\n  \"metadata\": {\n    \"order_id\": \"{{ $('In_Webhook_Manager_Confirm').item.json.body.order_id }}\"\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        416,
+        0
+      ],
+      "id": "ddce561f-da05-4547-a4c4-187486af8be3",
+      "name": "Core_POST_YooKassa",
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "5tQvCgni3OxxIU1V",
+          "name": "Ю-Касса"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO payments (order_id, yookassa_id, amount, status, paid_at)\nVALUES ('{{ $json.metadata.order_id }}', '{{ $json.id }}', '{{ $json.amount.value }}', 'pending', NULL)\nRETURNING id;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        624,
+        0
+      ],
+      "id": "ea99c9ab-58c2-4008-a7f5-b6b25df756a7",
+      "name": "Core_Save_Payment_Record",
+      "credentials": {
+        "postgres": {
+          "id": "nfkRfyn28AyMTSG3",
+          "name": "farm_db"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "1033205743",
+        "text": "=Ваш заказ подтвержден!\nСумма: {{ $('In_Webhook_Manager_Confirm').item.json.body.final_amount }} руб.\nОплатите по ссылке: {{ $('Core_POST_YooKassa').item.json.confirmation.confirmation_url }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        880,
+        0
+      ],
+      "id": "6b952d60-962e-4fa7-8548-5cd447af45ce",
+      "name": "Out_Send_Link_to_Client",
+      "webhookId": "3a48d647-f338-44d9-8a8c-16e24ffc06c8",
+      "credentials": {
+        "telegramApi": {
+          "id": "rwVuVCl6KWNrUdfg",
+          "name": "telegram_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "=",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        880,
+        208
+      ],
+      "id": "bfb9d9cb-91fa-4f6f-bc30-3299fe1cc985",
+      "name": "Out_Respond_to_Webhook"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "In_Webhook_Manager_Confirm": {
+      "main": [
+        [
+          {
+            "node": "Core_Update_Order",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Core_Update_Order": {
+      "main": [
+        [
+          {
+            "node": "Core_POST_YooKassa",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Core_POST_YooKassa": {
+      "main": [
+        [
+          {
+            "node": "Core_Save_Payment_Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Core_Save_Payment_Record": {
+      "main": [
+        [
+          {
+            "node": "Out_Send_Link_to_Client",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Out_Respond_to_Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Out_Send_Link_to_Client": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "09a6ab95-d9d2-437e-8bed-af17619fad49",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "af5a3702a7aa3744dcc13c632fa336b9901adc9f07abb9ced621cf6cccb586a2"
+  },
+  "id": "IQKiGUjpMiT0bSzR",
+  "tags": []
+}

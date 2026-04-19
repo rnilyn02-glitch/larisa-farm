@@ -1,0 +1,163 @@
+{
+  "name": "4-Cron",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtHour": 10
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        0
+      ],
+      "id": "0abab797-4a38-48bf-886f-f1d226e07f69",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n    o.id AS order_id,\n    o.delivery_address,\n    o.total_amount,\n    u.name AS customer_name,\n    u.phone AS customer_phone,\n    STRING_AGG(\n        p.name || ' (' || oi.quantity || ' ' || p.unit || ')',\n        ', '\n    ) AS items_list\nFROM orders o\nJOIN users u ON o.user_id = u.id\nJOIN order_items oi ON o.id = oi.order_id\nJOIN products p ON oi.product_id = p.id\nWHERE o.status = 'paid'\n  AND o.delivery_date = CURRENT_DATE\nGROUP BY o.id, o.delivery_address, o.total_amount, u.name, u.phone\nORDER BY o.delivery_address;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        208,
+        0
+      ],
+      "id": "daf1fce7-2424-4734-adf2-1324421b60ae",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "postgres": {
+          "id": "nfkRfyn28AyMTSG3",
+          "name": "farm_db"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Группируем заказы по адресу для оптимизации маршрута\nconst ordersByAddress = {};\n\nfor (const item of items) {\n  const addr = item.json.delivery_address;\n  if (!ordersByAddress[addr]) {\n    ordersByAddress[addr] = [];\n  }\n  ordersByAddress[addr].push(item.json);\n}\n\n// Формируем сообщение\nlet message = \"🚚 **ЗАДАНИЕ НА ДОСТАВКУ**\\n\";\nmessage += `📅 Дата: ${new Date().toLocaleDateString('ru-RU')}\\n`;\nmessage += `📦 Всего заказов: ${items.length}\\n\\n`;\n\nlet orderNum = 1;\nfor (const [address, orders] of Object.entries(ordersByAddress)) {\n  message += `📍 **Адрес: ${address}**\\n`;\n  for (const order of orders) {\n    message += `├─ Заказ #${order.order_id.slice(0,8)}\\n`;\n    message += `│  Клиент: ${order.customer_name}\\n`;\n    message += `│  Телефон: ${order.customer_phone}\\n`;\n    message += `│  Товары: ${order.items_list}\\n`;\n    message += `│  Сумма: ${order.total_amount} руб.\\n`;\n    orderNum++;\n  }\n  message += `\\n`;\n}\n\nreturn [{ json: { message } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        0
+      ],
+      "id": "24fa0f96-480e-4f2b-a474-7021bf58dbd6",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "chatId": "1033205743",
+        "text": "={{ $json.message }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        624,
+        0
+      ],
+      "id": "cba7c746-69a3-4cf9-912a-dea2ea1923eb",
+      "name": "Send a text message",
+      "webhookId": "b8564bdb-2234-4727-993d-3a4f5056468e",
+      "credentials": {
+        "telegramApi": {
+          "id": "rwVuVCl6KWNrUdfg",
+          "name": "telegram_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE orders\nSET status = 'in_delivery', updated_at = NOW()\nWHERE status = 'paid' AND delivery_date = CURRENT_DATE;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        832,
+        0
+      ],
+      "id": "8ce6aa21-1bc5-4dce-862d-fedfb1271085",
+      "name": "Execute a SQL query1",
+      "credentials": {
+        "postgres": {
+          "id": "nfkRfyn28AyMTSG3",
+          "name": "farm_db"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a text message": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "85416caf-5f82-43a2-82f6-9bcd558977ea",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "af5a3702a7aa3744dcc13c632fa336b9901adc9f07abb9ced621cf6cccb586a2"
+  },
+  "id": "GrFahOxNxvjOdpjW",
+  "tags": []
+}

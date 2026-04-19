@@ -1,0 +1,23 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# Node
+frontend/node_modules/
+frontend/.next/
+
+# Worktrees
+.worktrees/
+
+# Superpowers
+.superpowers/
+
+# Docker volumes
+postgres_data/
+n8n_data/
+pgadmin_data/
+traefik_data/
+
+# OS
+.DS_Store

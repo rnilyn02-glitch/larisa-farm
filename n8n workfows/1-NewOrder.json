@@ -1,0 +1,457 @@
+{
+  "name": "1-NewOrder",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "new-order",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1488,
+        -16
+      ],
+      "id": "7a25f59b-1cc3-404c-8347-5dfe5c4f1efb",
+      "name": "Webhook",
+      "webhookId": "7e5288e4-064d-4bae-83bd-372dd98e1099"
+    },
+    {
+      "parameters": {
+        "chatId": "=1033205743",
+        "text": "=🛒 Новый заказ #{{ $('Merge1').item.json.id }}\nСумма: {{ $('Merge1').item.json.preliminary_total }}\nАдрес: {{ $('Merge1').item.json.delivery.address }}\nОплата: {{ $('Merge1').item.json.payment.method }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        672,
+        208
+      ],
+      "id": "d91b7be9-0bab-4135-a239-57fa78d90d72",
+      "name": "Send a text message",
+      "webhookId": "830c59c1-2e27-4cb2-acc2-6629e098a36c",
+      "credentials": {
+        "telegramApi": {
+          "id": "rwVuVCl6KWNrUdfg",
+          "name": "telegram_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// n8n Code Node (JavaScript)\n// Извлекаем полезную нагрузку из обертки n8n Webhook\nconst data = $input.first().json.body;\n\n// 1. Валидация клиента\nif (!data.customer || !data.customer.phone) {\n  throw new Error('Missing required field: customer.phone');\n}\n\n// 2. Валидация товаров\nif (!data.items || !Array.isArray(data.items) || data.items.length === 0) {\n  throw new Error('Order is empty or items not specified');\n}\n\n// 3. Валидация каждого товара\nfor (const item of data.items) {\n  if (!item.product_id) {\n    throw new Error(`Missing product_id in item: ${JSON.stringify(item)}`);\n  }\n  if (typeof item.quantity !== 'number' || item.quantity <= 0) {\n    throw new Error(`Invalid quantity for product ${item.product_id}: ${item.quantity}`);\n  }\n  if (typeof item.price_at_moment !== 'number' || item.price_at_moment < 0) {\n    throw new Error(`Invalid price for product ${item.product_id}`);\n  }\n}\n\n// 4. Расчет предварительной суммы\nconst preliminaryTotal = data.items.reduce((sum, item) => {\n  return sum + (item.price_at_moment * item.quantity);\n}, 0);\n\n// 5. Возвращаем обогащенные данные\n// Важно: возвращаем структуру, которую ждут следующие ноды\nreturn {\n  json: {\n    ...data,  // Распаковываем исходный body, чтобы дальше работать с customer, items и т.д.\n    preliminary_total: preliminaryTotal,\n    received_at: new Date().toISOString(),\n    normalized_phone: data.customer.phone.replace(/[^\\d+]/g, '')\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1296,
+        -16
+      ],
+      "id": "62e1feee-4833-48dc-bb39-09aa5b8e5b16",
+      "name": "Code in JavaScript",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "c36cd785-77a7-48d8-9b4b-20fe7f39ecbe",
+              "leftValue": "={{ $json.user_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -576,
+        -144
+      ],
+      "id": "2980100f-f436-43ca-a979-78a36583b6d8",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO users (name, phone, role, discount_level, telegram_id)\nVALUES ('{{ $('Code in JavaScript').item.json.customer.name }}', '{{ $('Code in JavaScript').item.json.normalized_phone }}', 'customer', 0, {{ $('Webhook').item.json.body.customer.telegram_id }})\nRETURNING id AS user_id;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -384,
+        0
+      ],
+      "id": "a9541d4e-fc9e-4fab-8ba5-06a5f8809aaa",
+      "name": "Execute a SQL query Создание пользователя",
+      "credentials": {
+        "postgres": {
+          "id": "nfkRfyn28AyMTSG3",
+          "name": "farm_db"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id AS user_id, name, phone \nFROM users \nWHERE phone = '{{ $json.normalized_phone }}';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -784,
+        -144
+      ],
+      "id": "0320555c-e23f-4c92-91f4-00e0b530a19f",
+      "name": "Execute a SQL query Поиск пользователя",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "nfkRfyn28AyMTSG3",
+          "name": "farm_db"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO orders (user_id, delivery_address, delivery_date, payment_method, status, total_amount)\nVALUES ('{{ $json.user_id }}', '{{ $('Code in JavaScript').item.json.delivery.address }}', '{{ $('Code in JavaScript').item.json.delivery.date }}', '{{ $('Code in JavaScript').item.json.payment.method }}', 'new', '{{ $('Code in JavaScript').item.json.preliminary_total }}')\nRETURNING id;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        96,
+        -176
+      ],
+      "id": "b845961b-d3dc-4294-92cc-0c9f863c3993",
+      "name": "Execute a SQL query Новый заказ",
+      "credentials": {
+        "postgres": {
+          "id": "nfkRfyn28AyMTSG3",
+          "name": "farm_db"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO order_items (order_id, product_id, quantity, price_at_moment)\nVALUES ('{{ $json.id }}', '{{ $json.items.product_id }}', '{{ $json.items.quantity }}', '{{ $json.items.price_at_moment }}');",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        368,
+        208
+      ],
+      "id": "9bb75062-f194-4122-9f01-6893c604e0e9",
+      "name": "Execute a SQL query Заказаные товары",
+      "credentials": {
+        "postgres": {
+          "id": "nfkRfyn28AyMTSG3",
+          "name": "farm_db"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -32,
+        208
+      ],
+      "id": "54fe745c-3cdc-4c67-a2a7-2340610d20b9",
+      "name": "Merge1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "e0514413-1f69-4c17-ae1c-8364c1fbda17",
+              "leftValue": "={{ $json.user_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -208,
+        -160
+      ],
+      "id": "c3c22bba-82b0-4607-a778-19f7b040f505",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "items",
+        "include": "allOtherFields",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        144,
+        208
+      ],
+      "id": "bac1c421-a2b5-4340-8f24-c050162d009c",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": true,\n  \"message\": \"Заказ успешно оформлен\",\n  \"data\": {\n    \"order_id\": \"{{ $('Merge1').item.json.id }}\",\n    \"total_amount\": \"{{ $('Merge1').item.json.preliminary_total }}\",\n    \"delivery_date\": \"{{ $('Merge1').item.json.delivery.date }}\"\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        672,
+        432
+      ],
+      "id": "a9a60315-c11a-40f8-b430-ae508ef95615",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": false,\n  \"error\": {\n    \"message\": \"{{ $json.error }}\",\n    \"code\": \"VALIDATION_ERROR\"\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        -928,
+        208
+      ],
+      "id": "e492f7ef-b4c6-49a7-bfc0-cc386c796fd3",
+      "name": "Respond to Webhook1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Извлекаем ошибку из структуры n8n\nconst error = $input.first().json.error || $input.first().json;\n\n// Определяем код ошибки по тексту сообщения\nlet errorCode = 'UNKNOWN_ERROR';\nconst msg = error.message || '';\n\nif (msg.includes('customer.phone')) errorCode = 'MISSING_PHONE';\nelse if (msg.includes('items')) errorCode = 'INVALID_ITEMS';\nelse if (msg.includes('product_id')) errorCode = 'MISSING_PRODUCT_ID';\nelse if (msg.includes('quantity')) errorCode = 'INVALID_QUANTITY';\nelse if (msg.includes('price')) errorCode = 'INVALID_PRICE';\n\n// Возвращаем чистый формат для Respond to Webhook\nreturn {\n  json: {\n    success: false,\n    error: {\n      message: msg || 'Validation failed',\n      code: errorCode,\n      timestamp: new Date().toISOString()\n    }\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1104,
+        208
+      ],
+      "id": "8e558748-87e0-42ca-9680-80971ab66600",
+      "name": "Code in JavaScript1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query Поиск пользователя",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 1
+          }
+        ],
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Execute a SQL query Создание пользователя",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query Поиск пользователя": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query Создание пользователя": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query Новый заказ": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query Заказаные товары": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge1": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query Новый заказ",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query Заказаные товары",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a text message": {
+      "main": [
+        []
+      ]
+    },
+    "Respond to Webhook1": {
+      "main": [
+        []
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "70fc4721-5db9-4f57-8a5a-3fe1b336948e",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "af5a3702a7aa3744dcc13c632fa336b9901adc9f07abb9ced621cf6cccb586a2"
+  },
+  "id": "6cPdxSgkwY4elMRG",
+  "tags": []
+}

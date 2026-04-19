@@ -1,0 +1,253 @@
+{
+  "name": "3-Webhook от ЮKassa",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "yookassa-webhook",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "8a6265c5-0e02-4a9b-9331-8bb4e8df8709",
+      "name": "Webhook",
+      "webhookId": "4c3e368e-7e94-4f4e-9806-4fdfc94862ba"
+    },
+    {
+      "parameters": {
+        "chatId": "1033205743",
+        "text": "=💰 Заказ #{{ $('Webhook').item.json.body.object.metadata.order_id }} оплачен.\nКлиент:{{ $('Execute a SQL query1').item.json.phone }} \nСумма: {{ $('Webhook').item.json.body.object.amount.value }} руб.\nГотовим к доставке.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1216,
+        0
+      ],
+      "id": "625f339d-fad8-459a-ab2c-fb03a33a95c4",
+      "name": "Send a text Manager",
+      "webhookId": "394c47c3-61ec-4196-8464-59b8f7bdb69a",
+      "credentials": {
+        "telegramApi": {
+          "id": "rwVuVCl6KWNrUdfg",
+          "name": "telegram_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "1033205743",
+        "text": "=💰 Оплата заказа #{{ $('Webhook').item.json.body.object.metadata.order_id }} получена! ✅\nСумма: {{ $('Webhook').item.json.body.object.amount.value }} руб.\nЖдите доставку в воскресенье c 17 до 19 часов.",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1008,
+        0
+      ],
+      "id": "b034e430-eac6-4d3f-a12f-1409ca203b66",
+      "name": "Send a text Client",
+      "webhookId": "394c47c3-61ec-4196-8464-59b8f7bdb69a",
+      "credentials": {
+        "telegramApi": {
+          "id": "rwVuVCl6KWNrUdfg",
+          "name": "telegram_bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body.event }}",
+                    "rightValue": "payment.succeeded",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "3d0507bf-68e1-4d14-ae6c-ce7fbfc8f0f5"
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        208,
+        0
+      ],
+      "id": "794e7ba4-504d-4f03-baca-8f9d9eb98707",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE payments\nSET status = 'succeeded', paid_at = NOW()\nWHERE yookassa_id = '{{ $('Switch').item.json.body.object.id }}';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        816,
+        0
+      ],
+      "id": "5233642a-36ce-42b5-b2ce-0baca1797f61",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "postgres": {
+          "id": "nfkRfyn28AyMTSG3",
+          "name": "farm_db"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT o.id AS order_id, o.user_id, u.phone, o.total_amount\nFROM orders o\nJOIN users u ON o.user_id = u.id\nJOIN payments p ON o.id = p.order_id\nWHERE p.yookassa_id = '{{ $json.body.object.id }}';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        416,
+        0
+      ],
+      "id": "4a340b58-de50-44e2-b701-2e4373ba3220",
+      "name": "Execute a SQL query1",
+      "alwaysOutputData": false,
+      "credentials": {
+        "postgres": {
+          "id": "nfkRfyn28AyMTSG3",
+          "name": "farm_db"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE orders\nSET status = 'paid', updated_at = NOW()\nWHERE id = '{{ $json.order_id }}';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        624,
+        0
+      ],
+      "id": "03e1af5c-9eee-4e70-8587-e9fda57c3053",
+      "name": "Execute a SQL query2",
+      "credentials": {
+        "postgres": {
+          "id": "nfkRfyn28AyMTSG3",
+          "name": "farm_db"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a text Client": {
+      "main": [
+        [
+          {
+            "node": "Send a text Manager",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query1": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query2": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query": {
+      "main": [
+        [
+          {
+            "node": "Send a text Client",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "5df89f06-e5d1-40b6-8a66-06c6cc32b22f",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "af5a3702a7aa3744dcc13c632fa336b9901adc9f07abb9ced621cf6cccb586a2"
+  },
+  "id": "pS2phekKrGkErpTg",
+  "tags": []
+}
