@@ -25,13 +25,14 @@ export function Sidebar() {
         <p className="text-white/50 text-xs">Панель управления</p>
       </div>
 
-      <nav className="flex-1 p-2 space-y-0.5">
+      <nav aria-label="Admin navigation" className="flex-1 p-2 space-y-0.5">
         {NAV.map(({ href, label, exact }) => {
           const active = exact ? pathname === href : pathname.startsWith(href)
           return (
             <Link
               key={href}
               href={href}
+              aria-current={active ? 'page' : undefined}
               className={`block px-3 py-2 rounded-lg text-sm transition-colors ${
                 active
                   ? 'bg-white/15 text-white'
@@ -47,7 +48,7 @@ export function Sidebar() {
       <div className="p-3 border-t border-white/10">
         <button
           onClick={handleLogout}
-          className="w-full text-left px-3 py-2 text-sm text-white/60 hover:text-white transition-colors rounded-lg hover:bg-white/10"
+          className="w-full text-left px-3 py-2 text-sm text-white/60 hover:text-white transition-colors rounded-lg hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/30"
         >
           Выйти
         </button>
