@@ -6,7 +6,7 @@
 
 **Architecture:** Next.js 14 App Router with Server Components for data-fetching pages (ISR/SSR) and Client Components for interactivity. Cart state lives in Zustand persisted to localStorage. All data comes from n8n webhooks at `https://api.ramirezi1.online`. No customer authentication.
 
-**Tech Stack:** Next.js 14 · TypeScript · Tailwind CSS · Zustand 4 · React Hook Form 7 · Zod 3 · react-datepicker · Vitest · @testing-library/react
+**Tech Stack:** Next.js 14 · TypeScript · Tailwind CSS · Zustand 5 · React Hook Form 7 · Zod 3 · react-datepicker · Vitest · @testing-library/react
 
 ---
 
